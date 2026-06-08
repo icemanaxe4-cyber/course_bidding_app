@@ -5,6 +5,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('./src/models');
 const { startRoundScheduler } = require('./src/jobs/roundScheduler');
 const { bootstrapTerms } = require('./src/controllers/termController');
+const { seedIfEmpty } = require('./src/jobs/seedIfEmpty');
 
 const app = express();
 
@@ -73,6 +74,9 @@ const start = async () => {
 
     // Auto-create 3 default terms if the DB has none
     await bootstrapTerms();
+
+    // Auto-seed demo data if the database is completely empty
+    await seedIfEmpty();
 
     startRoundScheduler();
 
