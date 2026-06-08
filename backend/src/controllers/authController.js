@@ -65,60 +65,6 @@ const login = async (req, res) => {
   }
 };
 
-// ─── Supabase Login ───────────────────────────────────────────────────────────
-const supabaseLogin = async (req, res) => {
-  try {
-    const { access_token } = req.body;
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return res.status(503).json({ error: 'Supabase authentication is not configured.' });
-    }
-
-    if (!access_token) {
-      return res.status(400).json({ error: 'Supabase access token is required.' });
-    }
-
-    const authRes = await fetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`, {
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
-
-    if (!authRes.ok) {
-      return res.status(401).json({ error: 'Invalid Supabase session.' });
-    }
-
-    const profile = await authRes.json();
-    const email = profile.email?.toLowerCase();
-
-    if (!email) {
-      return res.status(401).json({ error: 'Supabase account does not include an email address.' });
-    }
-
-    const user = await User.findOne({
-      where: { email },
-      include: [{ model: Program, as: 'program', attributes: ['id', 'name', 'code', 'is_active'] }],
-    });
-    if (!user) {
-      return res.status(403).json({
-        error: 'No account found. Please contact admin to create your account.',
-      });
-    }
-
-    if (!user.is_active) {
-      return res.status(401).json({ error: 'Account is deactivated. Please contact admin.' });
-    }
-
-    res.json(buildAuthPayload(user));
-  } catch (err) {
-    console.error('Supabase login error:', err);
-    res.status(500).json({ error: 'Supabase sign-in failed.' });
-  }
-};
-
 // ─── Get current user ─────────────────────────────────────────────────────────
 const getMe = async (req, res) => {
   res.json({ user: req.user });
@@ -152,4 +98,4 @@ const changePassword = async (req, res) => {
 // NOTE: Public signup has been removed.
 // All accounts (student, faculty, admin) must be created by an admin via /api/users.
 
-module.exports = { login, supabaseLogin, getMe, changePassword };
+module.exports = { login, getMe, changePassword };
