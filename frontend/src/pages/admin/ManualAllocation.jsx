@@ -1,8 +1,8 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import API from '../../api/client';
 import toast from 'react-hot-toast';
 
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm, dedupeTerms } from '../../utils/termUtils';
 
 export default function ManualAllocation() {
   const [terms, setTerms] = useState([]);
@@ -80,7 +80,7 @@ export default function ManualAllocation() {
           style={{ minWidth: 180 }}
         >
           <option value="">Select term</option>
-          {terms.map(t => <option key={t.id} value={t.id}>{formatTerm(t)}</option>)}
+          {dedupeTerms(terms).map(t => <option key={t.id} value={t.id}>{formatTerm(t)}</option>)}
         </select>
       </div>
 

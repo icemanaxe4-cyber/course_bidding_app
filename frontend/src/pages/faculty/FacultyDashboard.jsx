@@ -5,7 +5,7 @@ import API from '../../api/client';
 
 const CRITERIA_LABELS = { cqpi: 'CQPI', sop: 'SOP', grade: 'Grade' };
 const CRITERIA_COLORS = { cqpi: 'badge-blue', sop: 'badge-purple', grade: 'badge-orange' };
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm } from '../../utils/termUtils';
 const getCoursePrograms = (course) => (
   (course.programs?.length ? course.programs : (course.program ? [course.program] : []))
     .filter(program => program.is_active !== false)

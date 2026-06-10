@@ -1,7 +1,7 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import API from '../../api/client';
 
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm, dedupeTerms } from '../../utils/termUtils';
 const formatAllocationBadge = (allocation) => {
   if (allocation.allocated_by === 'admin') return 'Admin Assigned';
   if (allocation.round?.round_number) return `Round ${allocation.round.round_number}`;
@@ -62,7 +62,7 @@ export default function MyAllocations() {
           style={{ minWidth: 180 }}
         >
           <option value="">All Terms</option>
-          {terms.map(t => (
+          {dedupeTerms(terms).map(t => (
             <option key={t.id} value={t.id}>{formatTerm(t)}</option>
           ))}
         </select>

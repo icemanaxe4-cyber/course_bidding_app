@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { User, Program, Course, CourseProgram } = require('../models');
+const { User, Program, Course, CourseProgram, Allocation, Application } = require('../models');
 const { Op } = require('sequelize');
 
 const getUsers = async (req, res) => {
@@ -119,15 +119,39 @@ const updateUser = async (req, res) => {
 
     await user.update(updates);
     if (user.role === 'faculty' && updates.is_active === false) {
-      await Course.update(
-        { status: 'cancelled', is_floated: false },
-        { where: { faculty_id: user.id } }
-      );
+      // BUG-4: Only cancel courses that have NO existing allocations
+      // Courses with students already allocated must stay active
+      const facultyCourses = await Course.findAll({
+        where: { faculty_id: user.id, status: { [Op.ne]: 'cancelled' } },
+        attributes: ['id'],
+      });
+      for (const c of facultyCourses) {
+        const allocationCount = await Allocation.count({ where: { course_id: c.id } });
+        if (allocationCount === 0) {
+          await Course.update({ status: 'cancelled', is_floated: false }, { where: { id: c.id } });
+          await Application.update(
+            { status: 'cancelled_course' },
+            { where: { course_id: c.id, status: { [Op.in]: ['pending', 'displaced'] } } }
+          );
+        }
+      }
     } else if (user.role === 'faculty' && updates.is_active === true) {
-      await Course.update(
-        { status: 'active' },
-        { where: { faculty_id: user.id, status: 'cancelled' } }
-      );
+      // BUG-5: Only restore courses that were cancelled because of faculty deactivation
+      // (i.e., courses with 0 allocations AND no 'cancelled_course' applications —
+      //  courses cancelled for under-subscription will have cancelled_course apps)
+      const facultyCancelledCourses = await Course.findAll({
+        where: { faculty_id: user.id, status: 'cancelled' },
+        attributes: ['id'],
+      });
+      for (const c of facultyCancelledCourses) {
+        const allocationCount = await Allocation.count({ where: { course_id: c.id } });
+        const cancelledAppCount = await Application.count({
+          where: { course_id: c.id, status: 'cancelled_course' },
+        });
+        if (allocationCount === 0 && cancelledAppCount === 0) {
+          await Course.update({ status: 'active' }, { where: { id: c.id } });
+        }
+      }
     }
     const { password_hash, ...userData } = user.toJSON();
     res.json(userData);
@@ -142,10 +166,21 @@ const deleteUser = async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' });
     await user.update({ is_active: false });
     if (user.role === 'faculty') {
-      await Course.update(
-        { status: 'cancelled', is_floated: false },
-        { where: { faculty_id: user.id } }
-      );
+      // BUG-4: Only cancel courses with no existing allocations (same logic as deactivation)
+      const facultyCourses = await Course.findAll({
+        where: { faculty_id: user.id, status: { [Op.ne]: 'cancelled' } },
+        attributes: ['id'],
+      });
+      for (const c of facultyCourses) {
+        const allocationCount = await Allocation.count({ where: { course_id: c.id } });
+        if (allocationCount === 0) {
+          await Course.update({ status: 'cancelled', is_floated: false }, { where: { id: c.id } });
+          await Application.update(
+            { status: 'cancelled_course' },
+            { where: { course_id: c.id, status: { [Op.in]: ['pending', 'displaced'] } } }
+          );
+        }
+      }
     }
     res.json({ message: 'User deactivated.' });
   } catch (err) {

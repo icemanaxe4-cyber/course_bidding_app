@@ -1,9 +1,9 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../api/client';
 import toast from 'react-hot-toast';
 
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm, dedupeTerms } from '../../utils/termUtils';
 
 export default function CourseCatalog() {
   const { user } = useAuth();
@@ -77,7 +77,7 @@ export default function CourseCatalog() {
               style={{ minWidth: 180 }}
             >
               <option value="">All Terms</option>
-              {catalogTerms.map(t => (
+              {dedupeTerms(catalogTerms).map(t => (
                 <option key={t.id} value={t.id}>{formatTerm(t)}</option>
               ))}
             </select>

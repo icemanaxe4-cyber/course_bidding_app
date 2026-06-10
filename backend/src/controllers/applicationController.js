@@ -132,11 +132,12 @@ const submitApplications = async (req, res) => {
     }
 
     const courses = await Course.findAll({
-      where: { id: { [Op.in]: courseIds }, status: 'active', is_floated: true },
+      // GAP-7: is_frozen: false — frozen courses stop new bids
+      where: { id: { [Op.in]: courseIds }, status: 'active', is_floated: true, is_frozen: false },
     });
 
     if (courses.length !== courseIds.length) {
-      return res.status(400).json({ error: 'One or more courses are invalid, inactive, or not floated.' });
+      return res.status(400).json({ error: 'One or more courses are invalid, inactive, not floated, or currently frozen.' });
     }
 
     const wrongTerm = courses.find(c => c.term_id !== round.term_id);

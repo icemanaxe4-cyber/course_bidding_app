@@ -1,9 +1,9 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../api/client';
 import { format, isPast } from 'date-fns';
 
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm } from '../../utils/termUtils';
 
 function Countdown({ closesAt }) {
   const [timeLeft, setTimeLeft] = useState('');

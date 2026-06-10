@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import API from '../../api/client';
 import toast from 'react-hot-toast';
 
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm } from '../../utils/termUtils';
 
 export default function RoundManagement() {
   const [programs, setPrograms] = useState([]);

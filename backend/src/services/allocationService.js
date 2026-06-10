@@ -231,12 +231,37 @@ const processRound = async (roundId) => {
       });
     }
 
-    // Update enrollment counts per course
-    for (const record of allocationRecords) {
-      await Course.increment('current_enrollment', {
-        where: { id: record.course_id },
-        transaction,
-      });
+    // BUG-2: Removed Course.increment('current_enrollment') — withCourseCounts computes live counts
+    // from Allocation.count(), so the stored field is redundant and causes drift.
+
+    // GAP-4: Cancel frozen courses that ended up with zero total enrollment after this round.
+    // A frozen course bypasses min_strength, but if nobody applied (or all were displaced)
+    // it stays 'active' forever in a limbo state — so we cancel it.
+    const frozenCourseIds = Object.keys(courseMap).filter(id => courseMap[id].course.is_frozen);
+    // Also check frozen courses in scope that had NO applicants (not in courseMap at all)
+    const allScopedFrozenCourses = await Course.findAll({
+      where: {
+        ...(Object.keys(courseWhere).length > 0 ? courseWhere : {}),
+        is_frozen: true,
+        status: 'active',
+      },
+      attributes: ['id'],
+      transaction,
+    });
+    for (const fc of allScopedFrozenCourses) {
+      if (cancelledCourseIds.includes(fc.id)) continue;
+      const totalEnrollment = await Allocation.count({ where: { course_id: fc.id }, transaction });
+      if (totalEnrollment === 0) {
+        cancelledCourseIds.push(fc.id);
+        await Course.update({ status: 'cancelled' }, { where: { id: fc.id }, transaction });
+        await Application.update(
+          { status: 'cancelled_course' },
+          {
+            where: { course_id: fc.id, round_id: roundId, status: { [Op.in]: ['pending', 'displaced'] } },
+            transaction,
+          }
+        );
+      }
     }
 
     await round.update(

@@ -1,4 +1,4 @@
-const { Program } = require('../models');
+const { Program, User, Course, BiddingRound } = require('../models');
 
 const getPrograms = async (req, res) => {
   try {
@@ -68,9 +68,26 @@ const deleteProgram = async (req, res) => {
   try {
     const program = await Program.findByPk(req.params.id);
     if (!program) return res.status(404).json({ error: 'Program not found.' });
-    await program.update({ is_active: false });
-    res.json({ message: 'Program deactivated.' });
+
+    // Block deletion if courses are still linked to this program
+    const courseCount = await Course.count({ where: { program_id: program.id } });
+    if (courseCount > 0) {
+      return res.status(409).json({
+        error: `Cannot delete: ${courseCount} course(s) are linked to this program. Remove them first.`,
+      });
+    }
+
+    // Reset program_id to null for all students enrolled in this program
+    await User.update({ program_id: null }, { where: { program_id: program.id } });
+
+    // Clean up bidding rounds for this program
+    await BiddingRound.destroy({ where: { program_id: program.id } });
+
+    // Permanently delete the program
+    await program.destroy();
+    res.json({ message: 'Program permanently deleted. Linked students have been unassigned.' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error.' });
   }
 };

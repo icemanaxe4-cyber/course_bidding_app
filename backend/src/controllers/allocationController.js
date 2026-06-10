@@ -1,4 +1,5 @@
 const { Allocation, User, Course, BiddingRound, Term, Application } = require('../models');
+const { Op } = require('sequelize');
 const { getDisplacedStudentsForTerm, getTermStats } = require('../services/allocationService');
 
 const getMyAllocations = async (req, res) => {
@@ -110,8 +111,13 @@ const manualAllocate = async (req, res) => {
       allocated_by: 'admin',
     });
 
-    await Course.increment('current_enrollment', { where: { id: course_id } });
+    // GAP-3: Mark the student's pending/displaced application for this course as allocated
+    await Application.update(
+      { status: 'allocated' },
+      { where: { student_id, course_id, status: { [Op.in]: ['pending', 'displaced'] } } }
+    );
 
+    // BUG-2: Do NOT increment stored current_enrollment — withCourseCounts computes it live
     res.status(201).json({ message: 'Manual allocation successful.', allocation });
   } catch (err) {
     console.error(err);

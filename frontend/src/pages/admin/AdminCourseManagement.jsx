@@ -4,7 +4,8 @@ import toast from 'react-hot-toast';
 
 const CRITERIA_LABELS = { cqpi: 'CQPI', sop: 'SOP', grade: 'Grade' };
 const CRITERIA_COLORS = { cqpi: 'badge-blue', sop: 'badge-purple', grade: 'badge-orange' };
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm, dedupeTerms } from '../../utils/termUtils';
+
 const getCoursePrograms = (course) => (
   (course.programs?.length ? course.programs : (course.program ? [course.program] : []))
     .filter(program => program.is_active !== false)
@@ -297,7 +298,7 @@ export default function AdminCourseManagement() {
                 style={{ minWidth: 180 }}
               >
                 <option value="">All Terms</option>
-                {terms.map(t => (
+                {dedupeTerms(terms).map(t => (
                   <option key={t.id} value={t.id}>{formatTerm(t)}</option>
                 ))}
               </select>
@@ -568,7 +569,7 @@ export default function AdminCourseManagement() {
                   <select className="form-select" value={form.term_id}
                     onChange={e => setForm(f => ({ ...f, term_id: e.target.value }))} required>
                     <option value="">Select term</option>
-                    {terms.map(t => (
+                    {dedupeTerms(terms).map(t => (
                       <option key={t.id} value={t.id}>{formatTerm(t)}</option>
                     ))}
                   </select>

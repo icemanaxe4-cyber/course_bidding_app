@@ -1,9 +1,9 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../../api/client';
 import toast from 'react-hot-toast';
 
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm, dedupeTerms } from '../../utils/termUtils';
 
 export default function CreateCourse() {
   const navigate = useNavigate();
@@ -114,7 +114,7 @@ export default function CreateCourse() {
                 <option value="">
                   {termsLoading ? 'Loading terms...' : terms.length === 0 ? 'No open terms available' : 'Select term'}
                 </option>
-                {terms.map(t => (
+                {dedupeTerms(terms).map(t => (
                   <option key={t.id} value={t.id}>
                     {formatTerm(t)} ({t.status})
                   </option>

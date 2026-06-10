@@ -2,6 +2,7 @@ const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
 const isProduction = process.env.NODE_ENV === 'production';
+const isRenderHost = (process.env.DB_HOST || '').includes('render.com');
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
@@ -18,8 +19,8 @@ const sequelize = new Sequelize(
       acquire: 30000,
       idle: 10000,
     },
-    // SSL is required for most cloud PostgreSQL providers (Render, Railway, etc.)
-    dialectOptions: isProduction
+    // SSL is required for cloud PostgreSQL providers (Render, Railway, etc.)
+    dialectOptions: (isProduction || isRenderHost)
       ? { ssl: { require: true, rejectUnauthorized: false } }
       : {},
   }

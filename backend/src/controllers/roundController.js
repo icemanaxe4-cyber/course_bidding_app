@@ -1,4 +1,4 @@
-const { sequelize, BiddingRound, Term, Program, Course } = require('../models');
+const { sequelize, BiddingRound, Term, Program, Course, Application, Allocation } = require('../models');
 const { processRound } = require('../services/allocationService');
 const { Op } = require('sequelize');
 
@@ -74,6 +74,19 @@ const createRound = async (req, res) => {
       return res.status(400).json({ error: 'Create or activate a term before creating a bidding round.' });
     }
 
+    // GAP-5: Block duplicate round_number for the same program + term
+    for (const pid of programIds) {
+      const duplicate = await BiddingRound.findOne({
+        where: { program_id: pid, round_number, term_id: resolvedTermId },
+      });
+      if (duplicate) {
+        const prog = programs.find(p => p.id === pid);
+        return res.status(409).json({
+          error: `Round ${round_number} already exists for program "${prog?.name}" in this term.`,
+        });
+      }
+    }
+
     const createdRounds = await sequelize.transaction(async (transaction) => {
       const rounds = [];
       for (const nextProgramId of programIds) {
@@ -114,7 +127,20 @@ const updateRound = async (req, res) => {
     const round = await BiddingRound.findByPk(req.params.id);
     if (!round) return res.status(404).json({ error: 'Round not found.' });
 
+    // GAP-1: Block updates on completed rounds entirely
+    if (round.status === 'completed') {
+      return res.status(400).json({ error: 'Cannot update a completed round.' });
+    }
+
     const { opens_at, closes_at, notes, covers_all_terms } = req.body;
+
+    // GAP-1: For open rounds, only allow notes to be changed
+    if (round.status === 'open' && (opens_at !== undefined || closes_at !== undefined || covers_all_terms !== undefined)) {
+      return res.status(400).json({
+        error: 'Cannot change timing or settings of an open round. Only notes can be updated.',
+      });
+    }
+
     const updates = {};
     if (opens_at !== undefined) updates.opens_at = opens_at;
     if (closes_at !== undefined) updates.closes_at = closes_at;
@@ -180,6 +206,10 @@ const deleteRound = async (req, res) => {
         error: `Cannot delete a round that is currently ${round.status}. Close it first.`,
       });
     }
+
+    // BUG-6: Clean up linked data before destroying the round
+    await Application.destroy({ where: { round_id: round.id } });
+    await Allocation.destroy({ where: { round_id: round.id } });
 
     await round.destroy();
     res.json({ message: 'Round deleted successfully.' });

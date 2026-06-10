@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 
 const MIN_COURSES_PER_TERM = 1;
 const MAX_COURSES_PER_TERM = 3;
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm } from '../../utils/termUtils';
 
 export default function MySelections() {
   const { user } = useAuth();

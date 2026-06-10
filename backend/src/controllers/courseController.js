@@ -283,6 +283,14 @@ const updateCourse = async (req, res) => {
       if (nextMin < 1 || nextMax < nextMin) {
         return res.status(400).json({ error: 'Seat limits must be valid.' });
       }
+      if (updates.max_strength !== undefined) {
+        const currentAllocations = await Allocation.count({ where: { course_id: course.id } });
+        if (nextMax < currentAllocations) {
+          return res.status(400).json({
+            error: `Cannot reduce max seats to ${nextMax}: ${currentAllocations} student(s) are already allocated to this course.`,
+          });
+        }
+      }
     }
 
     await course.update(updates);
@@ -310,6 +318,16 @@ const deleteCourse = async (req, res) => {
     const course = await Course.findByPk(req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found.' });
     const facultyId = course.faculty_id;
+
+    // BUG-1: Cancel all pending/displaced applications so students see correct status
+    await Application.update(
+      { status: 'cancelled_course' },
+      { where: { course_id: course.id, status: { [Op.in]: ['pending', 'displaced'] } } }
+    );
+
+    // Remove all allocations for this course so student records are clean
+    await Allocation.destroy({ where: { course_id: course.id } });
+
     await course.destroy();
     await deactivateFacultyIfNoActiveCourses(facultyId);
     res.json({ message: 'Course deleted.' });
@@ -337,9 +355,10 @@ const floatCourse = async (req, res) => {
       const nextFloated = !course.is_floated;
       await course.update({ is_floated: nextFloated });
       if (!nextFloated) {
+        // BUG-3: Also cancel 'displaced' apps, not just 'pending'
         await Application.update(
           { status: 'cancelled_course' },
-          { where: { course_id: course.id, status: 'pending' } }
+          { where: { course_id: course.id, status: { [Op.in]: ['pending', 'displaced'] } } }
         );
       }
     }
@@ -358,6 +377,11 @@ const freezeCourse = async (req, res) => {
   try {
     const course = await Course.findByPk(req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found.' });
+
+    // GAP-2: Only allow freezing active, floated courses
+    if (course.status !== 'active' || !course.is_floated) {
+      return res.status(400).json({ error: 'Only active, floated courses can be frozen or unfrozen.' });
+    }
 
     await course.update({ is_frozen: !course.is_frozen });
     res.json({ message: `Course ${course.is_frozen ? 'frozen' : 'unfrozen'}.`, course });

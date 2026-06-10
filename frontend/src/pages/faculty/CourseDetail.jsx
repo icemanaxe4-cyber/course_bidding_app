@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import API from '../../api/client';
 import toast from 'react-hot-toast';
 
-const formatTerm = (term) => term ? `Term ${term.term_number}` : '-';
+import { formatTerm } from '../../utils/termUtils';
 const getCoursePrograms = (course) => (
   (course.programs?.length ? course.programs : (course.program ? [course.program] : []))
     .filter(program => program.is_active !== false)

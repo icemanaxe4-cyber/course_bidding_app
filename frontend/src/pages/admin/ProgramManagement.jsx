@@ -9,6 +9,8 @@ export default function ProgramManagement() {
   const [form, setForm] = useState({ name: '', code: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null); // program to confirm delete
+  const [deleting, setDeleting] = useState(false);
 
   const load = () => API.get('/programs').then(res => setPrograms(res.data));
   useEffect(() => { load(); }, []);
@@ -46,9 +48,9 @@ export default function ProgramManagement() {
   };
 
   const deactivate = async (id) => {
-    if (!confirm('Deactivate this program?')) return;
+    if (!confirm('Deactivate this program? Students can no longer see it.')) return;
     try {
-      await API.delete(`/programs/${id}`);
+      await API.put(`/programs/${id}`, { is_active: false });
       toast.success('Program deactivated.');
       load();
     } catch (err) {
@@ -63,6 +65,21 @@ export default function ProgramManagement() {
       load();
     } catch (err) {
       toast.error('Failed.');
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await API.delete(`/programs/${deleteTarget.id}`);
+      toast.success('Program permanently deleted.');
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete program.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -134,15 +151,16 @@ export default function ProgramManagement() {
                 {program.description}
               </p>
             )}
-            <div className="flex gap-8" style={{ marginTop: 16 }}>
+            <div className="flex gap-8" style={{ marginTop: 16, flexWrap: 'wrap' }}>
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => openEdit(program)}
               >Edit</button>
               {program.is_active ? (
                 <button
-                  className="btn btn-danger btn-sm"
+                  className="btn btn-warning btn-sm"
                   onClick={() => deactivate(program.id)}
+                  style={{ background: 'var(--warning, #f59e0b)', color: '#fff', border: 'none' }}
                 >Deactivate</button>
               ) : (
                 <button
@@ -150,6 +168,10 @@ export default function ProgramManagement() {
                   onClick={() => reactivate(program.id)}
                 >Reactivate</button>
               )}
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => setDeleteTarget(program)}
+              >Delete</button>
             </div>
           </div>
         ))}
@@ -162,7 +184,7 @@ export default function ProgramManagement() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Create / Edit Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
@@ -214,6 +236,53 @@ export default function ProgramManagement() {
                 {saving ? 'Saving...' : editProgram ? 'Update Program' : 'Create Program'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 20 }}>
+              <h2 className="modal-title" style={{ color: 'var(--danger, #ef4444)' }}>⚠ Delete Program</h2>
+              <button className="modal-close" onClick={() => setDeleteTarget(null)} disabled={deleting}>✕</button>
+            </div>
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ marginBottom: 12 }}>
+                You are about to <strong>permanently delete</strong> the program:
+              </p>
+              <div style={{
+                background: 'var(--bg-secondary, #f8fafc)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '12px 16px',
+                marginBottom: 12,
+              }}>
+                <div className="course-code" style={{ marginBottom: 4 }}>{deleteTarget.code}</div>
+                <div className="course-name">{deleteTarget.name}</div>
+              </div>
+              <p className="text-muted text-sm">
+                This action <strong>cannot be undone</strong>. The program will be permanently removed from the system.
+                Any students currently enrolled in this program will have their program assignment <strong>reset to none</strong>.
+                Deletion will be blocked if courses are still linked to this program.
+              </p>
+            </div>
+            <div className="flex gap-8" style={{ justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+              >Cancel</button>
+              <button
+                id="confirm-delete-program"
+                className="btn btn-danger"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Yes, Delete Permanently'}
+              </button>
+            </div>
           </div>
         </div>
       )}
